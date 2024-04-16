@@ -1,0 +1,59 @@
+# Function to check if a user is logged in
+function IsUserLoggedIn {
+    param(
+        [string]$username
+    )
+
+    # Check if the user is logged in
+    $loggedInUsers = quser /server:localhost | Select-String -Pattern $username
+
+    if ($loggedInUsers) {
+        Write-Output "$username is logged in."
+    } else {
+        Write-Output "$username is not logged in."
+    }
+}
+
+# Function to check if a user has administrator permissions
+function CheckAdministratorPermissions {
+    param(
+        [string]$username
+    )
+
+    # Check if the user is in the local Administrators group
+    $isAdmin = [bool](net localgroup Administrators | Select-String -Pattern $username)
+
+    if ($isAdmin) {
+        Write-Output "$username has administrator permissions."
+    } else {
+        Write-Output "$username does not have administrator permissions."
+    }
+}
+
+# Get all local user accounts
+$localUsers = Get-WmiObject -Class Win32_UserAccount | Where-Object {$_.LocalAccount -eq $true}
+
+# Output the list of local user accounts and their administrator permissions
+Write-Output "List of local user accounts, their administrator permissions, and login status:"
+foreach ($user in $localUsers) {
+    Write-Output "Local user account: $($user.Name)"
+    CheckAdministratorPermissions $user.Name
+    IsUserLoggedIn $user.Name
+}
+
+# Get all domain user accounts (if the system is joined to a domain)
+try {
+    $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+    $domainUsers = $domain.GetDirectoryEntry().psbase.Children | Where-Object {$_.SchemaClassName -eq "user"}
+
+    # Output the list of domain user accounts and their administrator permissions
+    Write-Output "List of domain user accounts, their administrator permissions, and login status:"
+    foreach ($user in $domainUsers) {
+        $username = $user.Name
+        Write-Output "Domain user account: $username"
+        CheckAdministratorPermissions $username
+        IsUserLoggedIn $username
+    }
+} catch {
+    Write-Output "The system is not joined to a domain."
+}
